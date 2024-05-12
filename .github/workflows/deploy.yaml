@@ -1,0 +1,64 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+jobs:
+  checkout:
+    runs-on: self-hosted
+
+    steps:
+      - name: Clean repository
+        run: |
+          if [ "$(ls -A /home/user/actions-runner/_work/backend/backend)" ]; then
+            echo "Backend folder is not empty. Proceeding with cleaning..."
+            rm -rf /home/user/actions-runner/_work/backend/backend/*
+          else
+            echo "Backend folder is already empty. Skipping cleaning."
+          fi
+#        run: rm -rf /home/pydev/actions-runner/_work/backend/backend/*
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+
+  deploy:
+    runs-on: self-hosted
+    needs: checkout
+
+    strategy:
+      matrix:
+        services: [backend]  # названия контейнеров в docker-compose
+        # images: [backend_image, frontend_image]   название образов
+
+    steps:
+      - name: Remove previous containers
+        run: |
+          for service in ${{ matrix.services }}; do
+            if docker ps -a --format '{{.Names}}' | grep -q ${service}; then
+              docker stop ${service} && docker rm ${service}
+            else
+              echo "Container ${service} not found."
+              continue
+            fi
+            echo "Container ${service} was removed."
+          done
+
+
+      - name: Build and start docker containers
+        run: |
+          for service in ${{ matrix.services }}; do
+            docker-compose up -d --build ${service} 
+          done
+
+#      - name: Get container names and add container to docker network
+#        run: |
+#          for service in ${{ matrix.services }}; do
+#            sudo docker network connect f44669e2b3c0 ${service}
+#          done
+
+      - name: Finish
+        run: echo "Deployment successful"
