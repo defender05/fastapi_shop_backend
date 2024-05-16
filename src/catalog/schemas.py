@@ -9,7 +9,7 @@ class ProductBase(BaseModel):
     description: Optional[str] = Field(None)
     price: float = Field(0.0)
     discount_price: Optional[float] = Field(0.0)
-    remaining_stock: int = Field(0)
+    stock: int = Field(0)
     category_id: int = Field(0)
 
 class ProductCreate(ProductBase):
@@ -20,7 +20,7 @@ class ProductUpdate(ProductBase):
     description: Optional[str]
     price: Optional[float]
     discount_price: Optional[float]
-    remaining_stock: Optional[int]
+    stock: Optional[int]
     category_id: Optional[int]
 
 
@@ -51,26 +51,56 @@ class Category(CategoryBase):
         from_attributes = True
 
 
+class CartItemBase(BaseModel):
+    user_uuid: uuid.UUID = Field(None)
+    product_id: int = Field(1)
+    quantity: int = Field(1)
+
+class CartItemCreate(CartItemBase):
+    user_uuid: Optional[uuid.UUID] = Field(None, frozen=True)
+    product_id: int = Field(1)
+    quantity: int = Field(1, ge=1)
+    # user: Optional[str] = Field(None)
+    # product: Optional[str] = Field(None)
+
+class CartItemUpdate(CartItemBase):
+    quantity: int = Field(1, ge=1)
+
+class CartItem(CartItemBase):
+    id: int
+
+    class Config:
+        from_attributes = True
 
 
+class OrderBase(BaseModel):
+    user_id: int = Field(0)
+    status: str = Field(None)
+    total_price: float = Field(0.0)
 
-# class Category(BaseModel):
-#     name: str = Field(None)
-#     sub_categories: list = Field(None)
-#
-#
-# class CartItem(BaseModel):
-#     product_id: int = Field(None)
-#     quantity: int = Field(0)
-#
-#
-# class Cart(BaseModel):
-#     items: list[CartItem] = Field(None)
-#
-# class OrderItem(BaseModel):
-#     product_id: int = Field(None)
-#     quantity: int = Field(0)
-#
-#
-# class Order(BaseModel):
-#     items: list[OrderItem] = Field(None)
+class OrderCreate(OrderBase):
+    pass
+
+class Order(OrderBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
+class OrderItemBase(BaseModel):
+    user_id: int = Field(0)
+    product_id: int = Field(0)
+    quantity: int = Field(0)
+
+class OrderItemCreate(OrderItemBase):
+    pass
+
+class OrderItemUpdate(OrderItemBase):
+    pass
+
+class OrderItem(OrderItemBase):
+    id: int
+
+    class Config:
+        from_attributes = True

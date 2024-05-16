@@ -1,8 +1,11 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import JSONResponse
 from .models import ProductModel, CategoryModel
-from .schemas import (Product, ProductCreate, ProductUpdate, Category, CategoryCreate, CategoryUpdate)
-from .service import ProductService, CategoryService
+from .schemas import (Product, ProductCreate, ProductUpdate,
+                      Category, CategoryCreate, CategoryUpdate,
+                      CartItem, CartItemCreate, CartItemUpdate)
+from .service import ProductService, CategoryService, CartService
 from ..exceptions import InvalidCredentialsException
 from ..config import settings
 from src.users.dependencies import get_current_user, get_current_superuser
@@ -26,7 +29,24 @@ async def get_products(
 ) -> List[Product]:
     return await ProductService.get_products(offset=offset, limit=limit)
 
-@catalog_router.get("/product{product_id}")
+@catalog_router.get("/products/{category_id}")
+async def get_products_by_category(
+        category_id: Optional[int] = None,
+):
+    products = await ProductService.get_products_by_category(category_id)
+    # print(products)
+    for item in products:
+        print(item)
+
+    return products
+    # json_data = [dict(
+    #     id=item.id,
+    #     category_name=item.name,
+    #     sub_category=item.parent_id,
+    # ) for item in categories]
+    # return JSONResponse(content=json_data)
+
+@catalog_router.get("/product/{product_id}")
 async def get_product_by_id(
         product_id: int,
 ) -> Product:
@@ -47,8 +67,32 @@ async def get_categories(
 ) -> List[Category]:
     return await CategoryService.get_categories(offset=offset, limit=limit)
 
-@catalog_router.get("/category{category_id}")
+@catalog_router.get("/category/{category_id}")
 async def get_category_by_id(
         category_id: int,
 ) -> Category:
     return await CategoryService.get_category_by_id(category_id)
+
+
+@catalog_router.get("/cart_items")
+async def get_cart_items(
+    current_user: UserModel = Depends(get_current_user)
+) -> List[CartItem]:
+    return await CartService.get_cart_items(user_id=current_user.id)
+
+
+@catalog_router.post("/add_cart_item", status_code=status.HTTP_201_CREATED)
+async def add_cart_item(
+        cart_item: CartItemCreate = Depends(CartItemCreate),
+        current_user: UserModel = Depends(get_current_user),
+) -> CartItem:
+    cart_item.user_uuid = current_user.id
+    return await CartService.add_item_to_cart(cart_item)
+
+
+@catalog_router.delete("/remove_cart_item", status_code=status.HTTP_200_OK)
+async def remove_cart_item(
+        cart_id: int,
+        current_user: UserModel = Depends(get_current_user),
+):
+    await CartService.remove_cart_item(cart_id)

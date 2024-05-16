@@ -66,9 +66,8 @@ docker exec -it <CONTAINER_ID_OR_NAME> <COMMAND>
 
 # ALEMBIC
 ## Создание ревизии
-alembic revision --autogenerate -m "prod_postgres_rev"
-alembic revision --autogenerate -m "test_postgres_rev"
-## Применение изменений в ревизии к базе
+alembic revision --autogenerate -m "postgres_rev"
+## Применение изменений ревизии к базе
 alembic upgrade revision_id
 
 # CELERY и RABBIT MQ

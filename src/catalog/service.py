@@ -3,9 +3,16 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import HTTPException, status
-from .schemas import (Product, ProductCreate, ProductUpdate, Category, CategoryCreate, CategoryUpdate)
-from .models import ProductModel, CategoryModel, CartModel, OrderModel
-from .dao import ProductDAO, CategoryDAO
+from sqlalchemy import select, insert, update, delete, literal, func
+from sqlalchemy.orm import selectinload, joinedload, aliased, contains_eager
+
+from .schemas import (Product, ProductCreate, ProductUpdate,
+                      Category, CategoryCreate, CategoryUpdate,
+                      CartItem, CartItemCreate, CartItemUpdate,
+                      Order, OrderCreate,
+                      OrderItem, OrderItemCreate, OrderItemUpdate)
+from .models import ProductModel, CategoryModel, CartItemModel, OrderModel, OrderItemModel
+from .dao import ProductDAO, CategoryDAO, CartDAO
 from ..exceptions import InvalidTokenException, TokenExpiredException
 from ..database import async_session_maker
 from ..config import settings
@@ -13,15 +20,63 @@ from ..config import settings
 
 class ProductService:
     @classmethod
-    async def get_products(cls, *filter, offset: int = 0, limit: int = 100, **filter_by) -> list[Product]:
+    async def get_products(
+            cls,
+           *filter,
+           offset: int = 0,
+           limit: int = 100,
+           **filter_by
+    ) -> list[Product]:
+
         async with async_session_maker() as session:
-            products = await ProductDAO.find_all(session,*filter, offset=offset, limit=limit, **filter_by)
+            products = await ProductDAO.find_all(
+                session,
+                *filter,
+                offset=offset,
+                limit=limit,
+                **filter_by
+            )
 
         if products is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Products not found")
         return products
 
+    @classmethod
+    async def get_products_by_category(
+            cls,
+            category_id: int
+    ) -> list[Product]:
+
+        async with async_session_maker() as session:
+            # query = (
+            #     select(CategoryModel)
+            #     .where(CategoryModel.id == category_id)
+            #     .union_all(
+            #         select(CategoryModel).where(CategoryModel.parent_id == category_id)
+            #     )
+            # )
+            subquery = (
+                select(CategoryModel).where(CategoryModel.parent_id == category_id)
+            )
+            subresult = await session.execute(subquery)
+            subcategories = subresult.scalars().all()
+            subcats_ids = [category.id for category in subcategories]
+            subcats_ids.append(category_id)
+
+            prod_query = (
+                select(ProductModel)
+                .where(ProductModel.category_id.in_(subcats_ids))
+            )
+            prod_result = await session.execute(prod_query)
+            products_orm = prod_result.scalars().all()
+            products_dto = [Product.model_validate(product, from_attributes=True) for product in products_orm]
+            products = products_dto
+
+        if products is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Products not found")
+        return products  # [category for category in categories]
 
     @classmethod
     async def get_product_by_id(cls, product_id: int) -> Product:
@@ -110,3 +165,49 @@ class CategoryService:
             await session.commit()
 
         return new_category
+
+
+class CartService:
+    @classmethod
+    async def get_cart_items(cls, user_id: str) -> list[CartItem]:
+        async with async_session_maker() as session:
+            query = (
+                select(CartItemModel)
+                .where(CartItemModel.user_uuid == user_id)
+            )
+            result = await session.execute(query)
+            cart = result.scalars().all()
+
+        if cart is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Cart not found")
+        return cart
+
+    @classmethod
+    async def add_item_to_cart(cls, item: CartItemCreate) -> CartItem:
+        async with async_session_maker() as session:
+            cartitem_exist = await CartDAO.find_one_or_none(session, product_id=item.product_id)
+            if cartitem_exist:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT, detail="Cart item already exists")
+
+            new_cart_item = await CartDAO.add(
+                session,
+                item
+            )
+            await session.commit()
+
+        return new_cart_item
+
+    @classmethod
+    async def remove_cart_item(cls, cart_id: int):
+        async with async_session_maker() as session:
+            cartitem_exist = await CartDAO.find_one_or_none(session, id=cart_id)
+            if cartitem_exist is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Cart item not found")
+            await CartDAO.delete(
+                session,
+                CartItemModel.id == cart_id
+            )
+            await session.commit()

@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 
 try:
-    from ..catalog.models import CartModel
+    from ..catalog.models import CartItemModel, OrderModel
 except ImportError:
     pass
 
@@ -26,8 +26,13 @@ class UserModel(Base):
     is_verified: Mapped[bool] = mapped_column(default=False)
     is_superuser: Mapped[bool] = mapped_column(default=False)
 
-    cart: Mapped[list["CartModel"]] = relationship(
+    cart_items: Mapped[list["CartItemModel"]] = relationship(
         back_populates='user',
+        uselist=True,
+    )
+    orders: Mapped[list["OrderModel"]] = relationship(
+        back_populates='user',
+        uselist=True,
     )
 
 

@@ -1,7 +1,9 @@
 import datetime
+import uuid
+
 from typing_extensions import Annotated
-from sqlalchemy import MetaData, String, Boolean, ForeignKey, TIMESTAMP, LargeBinary, DATE, UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import MetaData, String, Boolean, ForeignKey, TIMESTAMP, LargeBinary, DATE, UUID, func
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, aliased
 from sqlalchemy.schema import UniqueConstraint, ForeignKeyConstraint
 
 from ..database import Base
@@ -16,13 +18,12 @@ class CategoryModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(nullable=False, unique=True)
     parent_id: Mapped[int] = mapped_column(
-        ForeignKey(
-        'categories.id',
-        onupdate="CASCADE",
-        ondelete="CASCADE",), nullable=True
+        ForeignKey('categories.id', onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=True
     )
     parent: Mapped["CategoryModel"] = relationship(
         "CategoryModel",
+        uselist=False,
         remote_side=[id]
     )
     products: Mapped[list["ProductModel"]] = relationship(
@@ -39,7 +40,7 @@ class ProductModel(Base):
     description: Mapped[str] = mapped_column(nullable=True)
     price: Mapped[float] = mapped_column(nullable=False)
     discount_price: Mapped[float] = mapped_column(nullable=True)
-    remaining_stock: Mapped[int] = mapped_column(nullable=False)
+    stock: Mapped[int] = mapped_column(nullable=False)
 
     category_id: Mapped[int] = mapped_column(
         ForeignKey(
@@ -69,20 +70,22 @@ class CartItemModel(Base):
     __tablename__ = 'cart_items'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-
-    cart_id: Mapped[str] = mapped_column(
-        ForeignKey('carts.id', onupdate="CASCADE", ondelete="CASCADE")
+    user_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID,
+        ForeignKey('users.id', onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False
     )
-    product_id: Mapped[str] = mapped_column(
-        ForeignKey('products.id', onupdate="CASCADE", ondelete="CASCADE")
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey('products.id', onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False
     )
 
-    quantity: Mapped[int] = mapped_column(nullable=False)
+    quantity: Mapped[int] = mapped_column(nullable=False, default=1)
 
-    cart: Mapped["CartModel"] = relationship(
+    user: Mapped["UserModel"] = relationship(
         back_populates="cart_items",
         uselist=False,
-        foreign_keys=[cart_id]
+        foreign_keys=[user_uuid]
     )
     product: Mapped[ProductModel] = relationship(
         back_populates="cart_item",
@@ -91,33 +94,62 @@ class CartItemModel(Base):
     )
 
 
-class CartModel(Base):
-    __tablename__ = 'carts'
+# class CartModel(Base):
+#     __tablename__ = 'carts'
+#
+#     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+#     user_id: Mapped[str] = mapped_column(
+#         ForeignKey('users.id', onupdate="CASCADE", ondelete="CASCADE")
+#     )
+#
+#     items: Mapped[list[CartItemModel]] = relationship(
+#         back_populates="cart",
+#         uselist=True
+#     )
+#     user: Mapped["UserModel"] = relationship(
+#         back_populates="cart",
+#         uselist=False,
+#         foreign_keys=[user_id]
+#     )
+
+class OrderModel(Base):
+    __tablename__ = 'orders'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(
-        ForeignKey('users.id', onupdate="CASCADE", ondelete="CASCADE")
+    user_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID,
+        ForeignKey('users.id', onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now()
+    )
+    status: Mapped[str] = mapped_column(nullable=False)
+    total_price: Mapped[float] = mapped_column(nullable=False)
+
+    user: Mapped["UserModel"] = relationship(
+        back_populates="orders",
+        uselist=False,
+        foreign_keys=[user_uuid]
     )
 
-    cart_items: Mapped[list[CartItemModel]] = relationship(
-        back_populates="cart",
+    order_items: Mapped[list["OrderItemModel"]] = relationship(
+        back_populates="order",
         uselist=True
-    )
-    user: Mapped["UserModel"] = relationship(
-        back_populates="cart",
-        uselist=False,
-        foreign_keys=[user_id]
     )
 
 
 class OrderItemModel(Base):
     __tablename__ = 'order_items'
+
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     order_id: Mapped[str] = mapped_column(
-        ForeignKey('orders.id', onupdate="CASCADE", ondelete="CASCADE")
+        ForeignKey('orders.id', onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False
     )
     product_id: Mapped[str] = mapped_column(
-        ForeignKey('products.id', onupdate="CASCADE", ondelete="CASCADE")
+        ForeignKey('products.id', onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False
     )
     quantity: Mapped[int] = mapped_column(nullable=False)
     price: Mapped[float] = mapped_column(nullable=False)  # Цена на момент покупки
@@ -132,15 +164,3 @@ class OrderItemModel(Base):
         uselist=False,
         foreign_keys=[product_id]
     )
-
-
-class OrderModel(Base):
-    __tablename__ = 'orders'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey('users.id', onupdate="CASCADE", ondelete="CASCADE"))
-    created_at: Mapped[datetime.datetime] = mapped_column(nullable=False)
-    status: Mapped[str] = mapped_column(nullable=False)
-
-    order_items: Mapped[list[OrderItemModel]] = relationship(back_populates="order", uselist=True)
-
