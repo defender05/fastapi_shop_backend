@@ -15,7 +15,7 @@ from redis import asyncio as aioredis
 
 # Routes
 from src.users.router import auth_router, user_router
-from src.catalog.router import catalog_router
+from src.catalog.router import catalog_router, cart_router, order_router
 
 
 @asynccontextmanager
@@ -41,6 +41,8 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(catalog_router)
+app.include_router(cart_router)
+app.include_router(order_router)
 
 
 @app.exception_handler(RequestValidationError)

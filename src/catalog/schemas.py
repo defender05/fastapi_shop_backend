@@ -1,6 +1,16 @@
+import datetime
 import uuid
+from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
+
+
+class OrderStatus(str, Enum):
+    CREATED = 'СОЗДАН'
+    PAID = 'ОПЛАЧЕН'
+    COMPLETED = 'ЗАВЕРШЕН'
+    CANCELLED = 'ОТМЕНЕН'
+
 
 # Товары ///////////////////////////////////////////////////////////////
 class ProductBase(BaseModel):
@@ -31,6 +41,8 @@ class Product(ProductBase):
         from_attributes = True
 
 
+
+
 # Категории ///////////////////////////////////////////////////////////////
 class CategoryBase(BaseModel):
     name: str = Field(None)
@@ -51,19 +63,21 @@ class Category(CategoryBase):
         from_attributes = True
 
 
+
+# Корзина ///////////////////////////////////////////////////////////////
 class CartItemBase(BaseModel):
     user_uuid: uuid.UUID = Field(None)
     product_id: int = Field(1)
     quantity: int = Field(1)
+    price: float = Field(0.0)
 
-class CartItemCreate(CartItemBase):
-    user_uuid: Optional[uuid.UUID] = Field(None, frozen=True)
+class CartItemCreate(BaseModel):
     product_id: int = Field(1)
     quantity: int = Field(1, ge=1)
-    # user: Optional[str] = Field(None)
-    # product: Optional[str] = Field(None)
+    price: float = Field(0.0)
 
 class CartItemUpdate(CartItemBase):
+    id: int
     quantity: int = Field(1, ge=1)
 
 class CartItem(CartItemBase):
@@ -73,13 +87,22 @@ class CartItem(CartItemBase):
         from_attributes = True
 
 
+
+# Ордеры ///////////////////////////////////////////////////////////////
 class OrderBase(BaseModel):
-    user_id: int = Field(0)
-    status: str = Field(None)
+    user_uuid: Optional[uuid.UUID] = Field(None)
+    created_at: Optional[datetime.datetime] = Field(None)
+    status: OrderStatus = Field(OrderStatus.CREATED)
     total_price: float = Field(0.0)
 
 class OrderCreate(OrderBase):
     pass
+    # user_uuid: Optional[uuid.UUID] = Field(None)
+    # status: OrderStatus = Field(OrderStatus.CREATED)
+    # total_price: Optional[float] = Field(0.0)
+
+class OrderUpdate(BaseModel):
+    status: OrderStatus = Field(OrderStatus.CREATED)
 
 class Order(OrderBase):
     id: int
@@ -89,9 +112,10 @@ class Order(OrderBase):
 
 
 class OrderItemBase(BaseModel):
-    user_id: int = Field(0)
-    product_id: int = Field(0)
-    quantity: int = Field(0)
+    user_uuid: Optional[uuid.UUID] = Field(None)
+    product_id: int = Field(1, ge=1)
+    quantity: int = Field(1, ge=1)
+    price: float = Field(0.0)
 
 class OrderItemCreate(OrderItemBase):
     pass

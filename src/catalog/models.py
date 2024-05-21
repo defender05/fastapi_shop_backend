@@ -81,6 +81,7 @@ class CartItemModel(Base):
     )
 
     quantity: Mapped[int] = mapped_column(nullable=False, default=1)
+    price: Mapped[float] = mapped_column(nullable=False, default=0.0)
 
     user: Mapped["UserModel"] = relationship(
         back_populates="cart_items",
@@ -116,14 +117,13 @@ class OrderModel(Base):
     __tablename__ = 'orders'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    # order_id: Mapped[str] = mapped_column(unique=True, nullable=False)
     user_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID,
         ForeignKey('users.id', onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False
     )
-    created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime.datetime] = mapped_column(nullable=False)
     status: Mapped[str] = mapped_column(nullable=False)
     total_price: Mapped[float] = mapped_column(nullable=False)
 
